@@ -109,9 +109,16 @@ export async function getHome(): Promise<HomeData> {
 
 /** Called by the worker so visitors almost never rebuild anything themselves. */
 export async function refreshPublicSnapshots(): Promise<void> {
-  const [home, charities, flags] = await Promise.all([loadHome(), loadCharitiesFresh(), store().getFlags()]);
+  const s = store();
+  const [home, charities, flags, explore] = await Promise.all([
+    loadHome(),
+    loadCharitiesFresh(),
+    s.getFlags(),
+    s.listCoins({ limit: 120, order: "new" }),
+  ]);
   await Promise.all([
     publishSnapshot("home", home),
+    publishSnapshot("explore", explore),
     publishSnapshot("charities", charities),
     publishSnapshot("flags", flags),
   ]);
