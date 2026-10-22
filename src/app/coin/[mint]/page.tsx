@@ -12,6 +12,7 @@ import CopyButton from "@/components/CopyButton";
 import Counter from "@/components/Counter";
 import Donut from "@/components/Donut";
 import Icon from "@/components/Icon";
+import PriceChart from "@/components/PriceChart";
 import { segsFor } from "@/components/SplitBar";
 import VerifiedBadge from "@/components/VerifiedBadge";
 
@@ -102,6 +103,7 @@ export default async function CoinPage({ params }: { params: { mint: string } })
 
       <div className="mt-10 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <div className="space-y-6">
+          <PriceChart mint={coin.mint} symbol={coin.symbol} />
           {/* split */}
           <section className="card p-6 sm:p-8">
             <h2 className="font-display text-xl font-bold">Where creator fees go</h2>
