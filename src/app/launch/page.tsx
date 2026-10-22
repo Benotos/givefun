@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: "Launch a coin", description: "Launch
 
 export default async function Launch() {
   const [all, flags] = await Promise.all([getCharities(), getFlags()]);
-  const charities = all.filter(isSelectable).map((c) => ({ slug: c.slug, name: c.name, cause: c.cause, blurb: c.blurb }));
+  const charities = all.filter(isSelectable).map((c) => ({ slug: c.slug, name: c.name, cause: c.cause, blurb: c.blurb, site_url: c.site_url }));
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
       <div className="eyebrow">Launch</div>

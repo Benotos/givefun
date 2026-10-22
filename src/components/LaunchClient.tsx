@@ -10,9 +10,10 @@ import { confirmByPolling } from "@/lib/confirm";
 import { sleep } from "@/lib/util";
 import CoinAvatar from "./CoinAvatar";
 import Icon from "./Icon";
+import CharityLogo from "./CharityLogo";
 import SplitBar, { segsFor } from "./SplitBar";
 
-type CharityOpt = { slug: string; name: string; cause: string; blurb: string };
+type CharityOpt = { slug: string; name: string; cause: string; blurb: string; site_url?: string };
 type Props = { charities: CharityOpt[]; platformBps: number; paused: boolean };
 
 const PENDING_KEY = "givefun:pending-lock";
@@ -343,8 +344,13 @@ function Form({ charities, platformBps, paused }: Props) {
                 }`}
               >
                 <input type="radio" name="charity" value={c.slug} checked={slug === c.slug} onChange={() => setSlug(c.slug)} className="sr-only" />
-                <div className="font-display font-bold leading-tight">{c.name}</div>
-                <div className="mt-1 text-xs text-mute">{c.cause}</div>
+                <div className="flex items-center gap-3">
+                  <CharityLogo slug={c.slug} name={c.name} siteUrl={c.site_url} size={40} />
+                  <div className="min-w-0">
+                    <div className="font-display font-bold leading-tight">{c.name}</div>
+                    <div className="mt-1 text-xs text-mute">{c.cause}</div>
+                  </div>
+                </div>
               </label>
             ))}
           </div>

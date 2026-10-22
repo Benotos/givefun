@@ -93,6 +93,15 @@ export async function loadHome(): Promise<HomeData> {
   return { stats, latest, top, topCharities, activity: events, generatedAt: Date.now() };
 }
 
+export async function getExplore(): Promise<Coin[]> {
+  const r = await getSnapshot<Coin[]>("explore", {
+    softSec: 15,
+    loader: () => store().listCoins({ limit: 120, order: "new" }),
+    fallback: [],
+  });
+  return r.data;
+}
+
 export async function getHome(): Promise<HomeData> {
   const r = await getSnapshot("home", { softSec: 10, loader: loadHome, fallback: EMPTY_HOME });
   return r.data;

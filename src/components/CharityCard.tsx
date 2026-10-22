@@ -2,11 +2,17 @@ import Link from "next/link";
 import type { Charity } from "@/lib/charities";
 import { fmtSol } from "@/lib/format";
 import Icon from "./Icon";
+import CharityLogo from "./CharityLogo";
 
 export default function CharityCard({ c, rank }: { c: Charity; rank?: number }) {
   const live = c.verified && c.active;
   return (
-    <Link href={`/charity/${c.slug}`} className="card card-hover block p-5">
+    <Link href={`/charity/${c.slug}`} className="card card-hover block overflow-hidden">
+      <div className="relative flex h-24 items-center justify-center bg-gradient-to-br from-ember/25 via-amber/10 to-transparent">
+        <div className="absolute inset-0 bg-[radial-gradient(60%_90%_at_50%_0%,rgba(255,199,102,0.18),transparent)]" />
+        <CharityLogo slug={c.slug} name={c.name} siteUrl={c.site_url} size={64} className="relative" />
+      </div>
+      <div className="p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           {rank !== undefined && <div className="mb-1 font-mono text-[11px] text-faint">#{rank}</div>}
@@ -31,6 +37,7 @@ export default function CharityCard({ c, rank }: { c: Charity; rank?: number }) 
         <div className="text-right text-xs text-mute">
           {c.coins} coin{c.coins === 1 ? "" : "s"}
         </div>
+      </div>
       </div>
     </Link>
   );

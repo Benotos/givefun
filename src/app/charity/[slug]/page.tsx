@@ -4,6 +4,7 @@ import CoinCard from "@/components/CoinCard";
 import CopyButton from "@/components/CopyButton";
 import Counter from "@/components/Counter";
 import Icon from "@/components/Icon";
+import CharityLogo from "@/components/CharityLogo";
 import { getCharity } from "@/lib/charities";
 import { store } from "@/lib/store";
 import { getSnapshot } from "@/lib/snapshot";
@@ -34,6 +35,7 @@ export default async function CharityPage({ params }: { params: { slug: string }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+      <CharityLogo slug={c.slug} name={c.name} siteUrl={c.site_url} size={80} className="mb-5" />
       <div className="eyebrow">{c.cause || "Charity"}</div>
       <h1 className="h-section mt-2">{c.name}</h1>
       {c.blurb && <p className="mt-4 max-w-2xl text-mute">{c.blurb}</p>}
