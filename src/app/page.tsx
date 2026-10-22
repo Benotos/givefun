@@ -115,8 +115,24 @@ export default async function Home() {
 
       {/* LIVE + LEADERBOARD */}
       <section className="mx-auto mt-20 max-w-6xl px-4 sm:px-6">
-        <div className="grid gap-8 lg:grid-cols-[1.15fr_1fr]">
+        <div className="space-y-16">
           <Reveal>
+            <div className="mb-5 flex items-end justify-between gap-4">
+              <h2 className="h-section !text-2xl sm:!text-3xl">Top charities</h2>
+              {h.topCharities.length > 0 && (
+                <Link href="/charities" className="btn-ghost btn-sm">
+                  See all charities <Icon name="arrow" size={14} />
+                </Link>
+              )}
+            </div>
+            {h.topCharities.length === 0 && <div className="card p-6 text-sm text-mute">Charities appear here once verified.</div>}
+            <div className="grid gap-3 sm:grid-cols-2">
+              {h.topCharities.slice(0, 4).map((c, i) => (
+                <CharityCard key={c.slug} c={c} rank={i + 1} />
+              ))}
+            </div>
+          </Reveal>
+          <Reveal delay={100}>
             <div className="mb-5 flex items-center gap-3">
               <h2 className="h-section !text-2xl sm:!text-3xl">Happening now</h2>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-mint/10 px-2.5 py-1 text-[11px] font-semibold text-mint">
@@ -124,20 +140,6 @@ export default async function Home() {
               </span>
             </div>
             <LiveFeed initial={{ stats: h.stats, activity: h.activity, generatedAt: h.generatedAt }} />
-          </Reveal>
-          <Reveal delay={100}>
-            <h2 className="h-section mb-5 !text-2xl sm:!text-3xl">Top charities</h2>
-            <div className="space-y-3">
-              {h.topCharities.length === 0 && <div className="card p-6 text-sm text-mute">Charities appear here once verified.</div>}
-              {h.topCharities.slice(0, 4).map((c, i) => (
-                <CharityCard key={c.slug} c={c} rank={i + 1} />
-              ))}
-              {h.topCharities.length > 0 && (
-                <Link href="/charities" className="btn-ghost w-full">
-                  See all charities <Icon name="arrow" size={14} />
-                </Link>
-              )}
-            </div>
           </Reveal>
         </div>
       </section>
