@@ -125,7 +125,7 @@ export default async function CoinPage({ params }: { params: { mint: string } })
                   <li key={s.label} className="flex items-center justify-between rounded-xl border border-line bg-raise/50 px-4 py-3">
                     <span className="inline-flex items-center gap-2.5">
                       <i className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
-                      {s.label === "Charity" ? charity?.name ?? "Charity" : s.label === "Dev" ? "Coin creator" : "give.fun"}
+                      {s.label === "Charity" ? charity?.name ?? "Charity" : s.label === "Dev" ? "Coin creator" : "Platform wallet"}
                     </span>
                     <b className="font-display text-base">{s.bps / 100}%</b>
                   </li>
@@ -133,6 +133,10 @@ export default async function CoinPage({ params }: { params: { mint: string } })
                 {devBps === 0 && <li className="text-xs text-mute">The creator keeps none of the fees on this coin.</li>}
               </ul>
             </div>
+            <p className="mt-4 text-xs leading-5 text-mute">
+              This is the locked distribution of creator fees for this coin. Pump.fun protocol fees are charged separately
+              by Pump.fun and are not the same as a shareholder percentage in this split.
+            </p>
           </section>
 
           {/* payouts */}
