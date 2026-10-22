@@ -6,9 +6,7 @@ import type { Metadata, Viewport } from "next";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import SiteBanner from "@/components/SiteBanner";
-import { SITE } from "@/lib/config";
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://give.fun";
+import { SITE, SITE_URL } from "@/lib/config";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
