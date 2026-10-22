@@ -62,8 +62,8 @@ export async function buildLaunchInstructions(i: LaunchIxInput): Promise<{
   });
 
   return {
-    create: [ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }), createIx],
-    share: [ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }), cfgIx, updIx],
+    create: [ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }), ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 200_000 }), createIx],
+    share: [ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }), ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 200_000 }), cfgIx, updIx],
   };
 }
 

@@ -17,6 +17,25 @@ export const maxDuration = 30;
 const MAX_IMG = 2 * 1024 * 1024;
 const IMG_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
+// Accepts a full https link, or for X and Telegram a bare handle. Returns "" when empty, null when invalid.
+function cleanLink(raw: string, kind: "web" | "x" | "tg"): string | null {
+  let v = raw.trim().slice(0, 200);
+  if (!v) return "";
+  if (!/^https?:\/\//i.test(v)) {
+    if (kind === "x" && /^@?[A-Za-z0-9_]{1,15}$/.test(v)) v = `https://x.com/${v.replace(/^@/, "")}`;
+    else if (kind === "tg" && /^@?[A-Za-z0-9_]{4,32}$/.test(v)) v = `https://t.me/${v.replace(/^@/, "")}`;
+    else v = `https://${v}`;
+  }
+  try {
+    const u = new URL(v);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    if (!u.hostname.includes(".")) return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 function bad(msg: string, status = 400) {
   return noStore({ error: msg }, status);
 }
@@ -40,6 +59,12 @@ export async function POST(req: Request) {
   const name = String(form.get("name") ?? "").trim();
   const symbol = String(form.get("symbol") ?? "").trim().toUpperCase();
   const description = String(form.get("description") ?? "").trim().slice(0, 500);
+  const website = cleanLink(String(form.get("website") ?? ""), "web");
+  const twitter = cleanLink(String(form.get("twitter") ?? ""), "x");
+  const telegram = cleanLink(String(form.get("telegram") ?? ""), "tg");
+  if (website === null) return bad("Website link is not valid");
+  if (twitter === null) return bad("X link is not valid");
+  if (telegram === null) return bad("Telegram link is not valid");
   const charitySlug = String(form.get("charitySlug") ?? "");
   const charityBps = Math.round(Number(form.get("charityPercent")) * 100);
   const image = form.get("image");
@@ -85,7 +110,7 @@ export async function POST(req: Request) {
   let uri: string;
   let imageUrl: string | null = null;
   try {
-    const m = await uploadMetadata({ file: image, name, symbol, description });
+    const m = await uploadMetadata({ file: image, name, symbol, description, website, twitter, telegram });
     uri = m.uri;
     imageUrl = m.imageUrl;
   } catch (e) {

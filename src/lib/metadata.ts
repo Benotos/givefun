@@ -4,7 +4,7 @@
 //      sometimes blocks server traffic, so it is the fallback.
 // Returns the metadata URI that goes on chain and the image URL we store.
 
-export type MetaInput = { file: File; name: string; symbol: string; description: string };
+export type MetaInput = { file: File; name: string; symbol: string; description: string; website?: string; twitter?: string; telegram?: string };
 export type MetaResult = { uri: string; imageUrl: string | null; via: "pinata" | "pump" };
 
 const TIMEOUT_MS = 15_000;
@@ -30,7 +30,7 @@ async function viaPinata(i: MetaInput): Promise<MetaResult> {
   if (!imgCid) throw new Error("pinata image: no hash");
   const imageUrl = `${gateway()}/${imgCid}`;
 
-  const json = { name: i.name, symbol: i.symbol, description: i.description, image: imageUrl, showName: true, createdOn: "https://pump.fun" };
+  const json = { name: i.name, symbol: i.symbol, description: i.description, image: imageUrl, showName: true, createdOn: "https://pump.fun", ...(i.website ? { website: i.website } : {}), ...(i.twitter ? { twitter: i.twitter } : {}), ...(i.telegram ? { telegram: i.telegram } : {}) };
   const r2 = await fetch(`${pinataBase()}/pinning/pinJSONToIPFS`, {
     method: "POST",
     headers: { ...auth, "Content-Type": "application/json" },
@@ -50,6 +50,9 @@ async function viaPump(i: MetaInput): Promise<MetaResult> {
   fd.append("symbol", i.symbol);
   fd.append("description", i.description);
   fd.append("showName", "true");
+  if (i.website) fd.append("website", i.website);
+  if (i.twitter) fd.append("twitter", i.twitter);
+  if (i.telegram) fd.append("telegram", i.telegram);
   const res = await fetch(process.env.METADATA_UPLOAD_URL || "https://pump.fun/api/ipfs", {
     method: "POST",
     body: fd,

@@ -50,6 +50,9 @@ function Form({ charities, platformBps, paused }: Props) {
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [description, setDescription] = useState("");
+  const [website, setWebsite] = useState("");
+  const [twitter, setTwitter] = useState("");
+  const [telegram, setTelegram] = useState("");
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [slug, setSlug] = useState(charities[0]?.slug ?? "");
@@ -182,6 +185,12 @@ function Form({ charities, platformBps, paused }: Props) {
     setErr("");
     if (!publicKey || !signAllTransactions) return setErr("Connect your wallet first");
     if (!image) return setErr("Add an image");
+    try {
+      const bal = await connection.getBalance(publicKey, "confirmed");
+      if (bal < 25_000_000) {
+        return setErr(`Your wallet has ${(bal / 1e9).toFixed(4)} SOL. A launch needs about 0.03 SOL. Add SOL first so nothing is wasted.`);
+      }
+    } catch { /* balance check is best effort */ }
     let ticket = "";
     let mint = "";
     try {
@@ -191,6 +200,9 @@ function Form({ charities, platformBps, paused }: Props) {
       fd.append("name", name);
       fd.append("symbol", symbol);
       fd.append("description", description);
+      fd.append("website", website);
+      fd.append("twitter", twitter);
+      fd.append("telegram", telegram);
       fd.append("charitySlug", slug);
       fd.append("charityPercent", String(pctClamped));
       fd.append("image", image);
@@ -292,6 +304,20 @@ function Form({ charities, platformBps, paused }: Props) {
           <div>
             <label className="label" htmlFor="desc">Description</label>
             <textarea id="desc" className="input" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} placeholder="What is this coin about?" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <label className="label" htmlFor="web">Website (optional)</label>
+              <input id="web" className="input" value={website} onChange={(e) => setWebsite(e.target.value)} maxLength={200} placeholder="https://yoursite.com" />
+            </div>
+            <div>
+              <label className="label" htmlFor="tw">X / Twitter (optional)</label>
+              <input id="tw" className="input" value={twitter} onChange={(e) => setTwitter(e.target.value)} maxLength={200} placeholder="@handle or link" />
+            </div>
+            <div>
+              <label className="label" htmlFor="tg">Telegram (optional)</label>
+              <input id="tg" className="input" value={telegram} onChange={(e) => setTelegram(e.target.value)} maxLength={200} placeholder="t.me/yourgroup" />
+            </div>
           </div>
           <div>
             <label className="label" htmlFor="img">Image (png, jpg, gif or webp, max 2MB)</label>
