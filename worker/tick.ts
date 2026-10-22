@@ -6,7 +6,7 @@ import {
   ComputeBudgetProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
-import { OnlinePumpSdk, PUMP_SDK, feeSharingConfigPda } from "@pump-fun/pump-sdk";
+import { OnlinePumpSdk, PUMP_SDK, feeSharingConfigPda, GLOBAL_PDA } from "@pump-fun/pump-sdk";
 import { store } from "../src/lib/store";
 import type { Coin } from "../src/lib/store";
 import { MIN_CHARITY_BPS } from "../src/lib/config";
@@ -27,6 +27,13 @@ export type TickStats = {
 
 export async function runTick(conn: Connection, signer: Keypair | null): Promise<TickStats> {
   const s = store();
+
+  // Safety check. A bad RPC key or the wrong network returns "account not found" for everything,
+  // which would wrongly revoke every coin. Read an account that always exists on pump.fun mainnet first.
+  // If it is missing the RPC is wrong, so stop before changing anything.
+  const probe = await conn.getAccountInfo(GLOBAL_PDA, "confirmed");
+  if (!probe) throw new Error("RPC check failed: pump.fun global account not found. Wrong network or bad RPC key. Nothing was changed.");
+
   const coins = await s.coinsForWorker();
   const stats: TickStats = { coins: coins.length, verified: 0, revoked: 0, failed: 0, distributed: 0, errors: 0 };
 

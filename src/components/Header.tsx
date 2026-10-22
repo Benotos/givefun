@@ -8,6 +8,7 @@ import XIcon from "./XIcon";
 import { X_URL } from "@/lib/config";
 
 const NAV = [
+  { href: "/", label: "Home" },
   { href: "/explore", label: "Explore" },
   { href: "/charities", label: "Charities" },
   { href: "/how-it-works", label: "How it works" },
