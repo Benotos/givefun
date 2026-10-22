@@ -1,8 +1,12 @@
 export const SITE = {
   name: "Give.fun",
   tagline: "Launch a coin. Fees go to charity. Provable on chain.",
-  domain: "give.fun",
+  domain: "give-fun.xyz",
 };
+
+// Canonical production URL. Use it for metadata and all share links so links do not point
+// at the old give.fun placeholder domain.
+export const SITE_URL = `https://${SITE.domain}`;
 
 export const X_URL = "https://x.com/GiveDotFun_";
 export const X_HANDLE = "@GiveDotFun_";
