@@ -427,6 +427,10 @@ function Form({ charities, platformBps, paused }: Props) {
             </div>
           </div>
           <SplitBar segs={segs} legend height={10} />
+          <p className="text-xs leading-5 text-mute">
+            These percentages split creator fees. Pump.fun's protocol fee is charged separately by Pump.fun and is not
+            one of the shareholder percentages above.
+          </p>
           <p className="text-xs text-mute">Locked on chain right after launch. You cannot change it later, and neither can we.</p>
         </section>
 
