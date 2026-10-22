@@ -7,5 +7,5 @@ export const revalidate = 5;
 
 export async function GET() {
   const h = await getHome();
-  return cached({ stats: h.stats, activity: h.activity, generatedAt: h.generatedAt }, 5, 30);
+  return cached({ stats: h.stats, activity: h.activity, generatedAt: h.generatedAt }, 5, 10);
 }

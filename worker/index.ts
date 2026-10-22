@@ -92,8 +92,11 @@ async function main() {
     await publishBeat();
   };
 
-  await snapLoop();
+  // Run verification/distribution before publishing snapshots. The scheduled GitHub worker
+  // exits after one pass, so snapshotting first made newly verified coins wait for the next
+  // five-minute cron run before appearing in Home and Explore.
   await chainLoop();
+  await snapLoop();
   if (once) {
     // Scheduled mode (GitHub Actions). Exit explicitly so the job ends right away.
     process.exit(0);

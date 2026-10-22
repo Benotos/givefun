@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { createChart, type IChartApi, type ISeriesApi, type UTCTimestamp } from "lightweight-charts";
 import { toCandles, TOTAL_SUPPLY, type Trade } from "@/lib/candles";
 
-// Our own chart. Trades are read from the chain by /api/candles, so a brand new coin charts from its first trade.
-// Y axis is market cap in SOL (price times the 1 billion supply every pump.fun coin has).
+// On-chain trades are denominated in SOL. Convert market cap to USD using the current SOL/USD
+// spot quote so the header and chart use the same currency.
 const TFS = [
   { k: "1s", s: 1 },
   { k: "5s", s: 5 },
@@ -19,10 +19,21 @@ const TFS = [
 const UP = "#34d399";
 const DOWN = "#fb7185";
 
-function fmt(n: number) {
-  if (n >= 1000) return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
-  if (n >= 1) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+function fmtUsd(n: number) {
+  if (!Number.isFinite(n)) return "—";
+  if (n >= 1000) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      notation: "compact",
+      maximumFractionDigits: 2,
+    }).format(n);
+  }
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: n < 1 ? 4 : 2,
+  }).format(n);
 }
 
 export default function PriceChart({ mint, symbol }: { mint: string; symbol: string }) {
@@ -33,7 +44,38 @@ export default function PriceChart({ mint, symbol }: { mint: string; symbol: str
   const [tf, setTf] = useState(TFS[5]);
   const [trades, setTrades] = useState<Trade[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [solUsd, setSolUsd] = useState<number | null>(null);
+  const [solUsdError, setSolUsdError] = useState(false);
   const pump = `https://pump.fun/coin/${mint}`;
+
+  // The API route caches a shared spot quote so each chart doesn't call an exchange directly.
+  useEffect(() => {
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const load = async () => {
+      try {
+        const r = await fetch("/api/sol-price", { cache: "no-store" });
+        if (!r.ok) throw new Error(`SOL price HTTP ${r.status}`);
+        const body = (await r.json()) as { priceUsd?: number };
+        const price = Number(body.priceUsd);
+        if (!Number.isFinite(price) || price <= 0) throw new Error("Invalid SOL/USD quote");
+        if (!stopped) {
+          setSolUsd(price);
+          setSolUsdError(false);
+        }
+      } catch {
+        if (!stopped) setSolUsdError(true);
+      }
+      if (!stopped) timer = setTimeout(load, document.hidden ? 120_000 : 30_000);
+    };
+
+    void load();
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
+  }, []);
 
   // Remember the chosen timeframe for the next chart, in this browser.
   useEffect(() => {
@@ -70,7 +112,7 @@ export default function PriceChart({ mint, symbol }: { mint: string; symbol: str
       wickUpColor: UP,
       wickDownColor: DOWN,
       borderVisible: false,
-      priceFormat: { type: "custom", formatter: (p: number) => fmt(p) },
+      priceFormat: { type: "custom", formatter: (p: number) => fmtUsd(p) },
     });
     volS.current = c.addHistogramSeries({ priceFormat: { type: "volume" }, priceScaleId: "vol" });
     c.priceScale("vol").applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
@@ -107,17 +149,29 @@ export default function PriceChart({ mint, symbol }: { mint: string; symbol: str
 
   // draw
   useEffect(() => {
-    if (!trades || !candleS.current || !volS.current) return;
-    const scaled: Trade[] = trades.map((t) => [t[0], t[1] * TOTAL_SUPPLY, t[2], t[3]]);
+    if (!trades || solUsd === null || !candleS.current || !volS.current) return;
+    // Convert SOL market cap to its current USD equivalent; trade volume remains denominated in SOL.
+    const scaled: Trade[] = trades.map((t) => [t[0], t[1] * TOTAL_SUPPLY * solUsd, t[2], t[3]]);
     const { candles, volume } = toCandles(scaled, tf.s);
     candleS.current.setData(candles.map((c) => ({ ...c, time: c.time as UTCTimestamp })));
     volS.current.setData(volume.map((v) => ({ time: v.time as UTCTimestamp, value: v.value, color: v.up ? "rgba(52,211,153,0.35)" : "rgba(251,113,133,0.35)" })));
     chart.current?.applyOptions({ timeScale: { secondsVisible: tf.s < 60 } });
     chart.current?.timeScale().fitContent();
-  }, [trades, tf]);
+  }, [trades, tf, solUsd]);
 
-  const last = trades && trades.length ? trades[trades.length - 1][1] * TOTAL_SUPPLY : null;
+  const lastUsd = trades && trades.length && solUsd !== null
+    ? trades[trades.length - 1][1] * TOTAL_SUPPLY * solUsd
+    : null;
   const empty = trades !== null && trades.length === 0;
+  const marketCap = lastUsd !== null
+    ? fmtUsd(lastUsd)
+    : trades === null
+      ? "loading"
+      : empty
+        ? "—"
+        : solUsdError
+          ? "USD price unavailable"
+          : "loading USD price";
 
   return (
     <section className="card overflow-hidden">
@@ -125,7 +179,7 @@ export default function PriceChart({ mint, symbol }: { mint: string; symbol: str
         <div>
           <h2 className="font-display text-xl font-bold">${symbol} chart</h2>
           <div className="mt-0.5 text-xs text-mute">
-            Market cap {last !== null ? <b className="text-white">{fmt(last)} SOL</b> : "loading"}
+            Market cap <b className="text-white">{marketCap}</b>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -146,14 +200,20 @@ export default function PriceChart({ mint, symbol }: { mint: string; symbol: str
       </div>
       <div className="relative h-[480px] w-full border-t border-line bg-ink">
         <div ref={box} className="absolute inset-0" />
-        {(trades === null || empty || failed) && (
+        {(trades === null || empty || failed || solUsd === null) && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-mute">
-            {failed && trades === null ? "Could not load the chart. Retrying." : empty ? "No trades yet. The chart starts with the first trade." : "Loading chart"}
+            {failed && trades === null
+              ? "Could not load the chart. Retrying."
+              : empty
+                ? "No trades yet. The chart starts with the first trade."
+                : solUsd === null && solUsdError
+                  ? "USD spot price unavailable. Retrying."
+                  : "Loading chart"}
           </div>
         )}
       </div>
       <p className="border-t border-line px-6 py-3 text-xs text-mute">
-        Live from the chain, updates every few seconds. Market cap in SOL. Trading happens on pump.fun.
+        Live from on-chain trades. USD market cap uses the current SOL/USD spot price. Trading happens on pump.fun.
       </p>
     </section>
   );
