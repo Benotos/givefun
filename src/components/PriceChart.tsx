@@ -200,9 +200,15 @@ export default function PriceChart({ mint, symbol }: { mint: string; symbol: str
       </div>
       <div className="relative h-[480px] w-full border-t border-line bg-ink">
         <div ref={box} className="absolute inset-0" />
-        {(trades === null || empty || failed) && (
+        {(trades === null || empty || failed || solUsd === null) && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-mute">
-            {failed && trades === null ? "Could not load the chart. Retrying." : empty ? "No trades yet. The chart starts with the first trade." : "Loading chart"}
+            {failed && trades === null
+              ? "Could not load the chart. Retrying."
+              : empty
+                ? "No trades yet. The chart starts with the first trade."
+                : solUsd === null && solUsdError
+                  ? "USD spot price unavailable. Retrying."
+                  : "Loading chart"}
           </div>
         )}
       </div>
