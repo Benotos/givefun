@@ -4,17 +4,29 @@ import {
   PublicKey,
   Transaction,
   TransactionInstruction,
+  TransactionMessage,
+  VersionedTransaction,
   ComputeBudgetProgram,
 } from "@solana/web3.js";
+import { loadLaunchTable } from "./lut";
 import { NATIVE_MINT, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import {
   PUMP_SDK,
   OnlinePumpSdk,
   feeSharingConfigPda,
   bondingCurvePda,
+  getBuyTokenAmountFromSolAmount,
 } from "@pump-fun/pump-sdk";
+import type { Global } from "@pump-fun/pump-sdk";
+import BN from "bn.js";
 import type { Share } from "./shares";
 import { MIN_CHARITY_BPS } from "./config";
+
+export class TooLargeError extends Error {
+  constructor() {
+    super("Name, ticker or links are too long to include a dev buy");
+  }
+}
 
 export type LaunchIxInput = {
   creator: PublicKey;
@@ -23,6 +35,8 @@ export type LaunchIxInput = {
   symbol: string;
   uri: string;
   shares: Share[];
+  /** Optional dev buy. Runs in the same transaction as create, so nobody can snipe the coin first. */
+  devBuy?: { global: Global; amount: BN; solAmount: BN };
 };
 
 /**
@@ -35,15 +49,31 @@ export async function buildLaunchInstructions(i: LaunchIxInput): Promise<{
   create: TransactionInstruction[];
   share: TransactionInstruction[];
 }> {
-  const createIx = await PUMP_SDK.createV2Instruction({
-    mint: i.mint,
-    name: i.name,
-    symbol: i.symbol,
-    uri: i.uri,
-    creator: i.creator,
-    user: i.creator,
-    mayhemMode: false,
-  });
+  // With a dev buy: create_v2 + the creator's token account + the first buy, all in one transaction.
+  const createIxs = i.devBuy
+    ? await PUMP_SDK.createV2AndBuyInstructions({
+        global: i.devBuy.global,
+        mint: i.mint,
+        name: i.name,
+        symbol: i.symbol,
+        uri: i.uri,
+        creator: i.creator,
+        user: i.creator,
+        amount: i.devBuy.amount,
+        solAmount: i.devBuy.solAmount,
+        mayhemMode: false,
+      })
+    : [
+        await PUMP_SDK.createV2Instruction({
+          mint: i.mint,
+          name: i.name,
+          symbol: i.symbol,
+          uri: i.uri,
+          creator: i.creator,
+          user: i.creator,
+          mayhemMode: false,
+        }),
+      ];
 
   const cfgIx = await PUMP_SDK.createFeeSharingConfig({
     creator: i.creator,
@@ -62,7 +92,13 @@ export async function buildLaunchInstructions(i: LaunchIxInput): Promise<{
   });
 
   return {
-    create: [ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }), ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 200_000 }), createIx],
+    // With a dev buy the transaction is close to the size limit, so the compute limit instruction is dropped
+    // (the default limit is enough). The priority fee stays so the transaction lands.
+    create: [
+      ...(i.devBuy ? [] : [ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 })]),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 200_000 }),
+      ...createIxs,
+    ],
     share: [ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }), ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 200_000 }), cfgIx, updIx],
   };
 }
@@ -75,22 +111,50 @@ export async function buildLaunchTransactions(
   connection: Connection,
   i: LaunchIxInput,
   mintKeypair: Keypair,
-): Promise<Transaction[]> {
-  const { create, share } = await buildLaunchInstructions(i);
+  devBuyLamports?: bigint,
+): Promise<{ txs: (Transaction | VersionedTransaction)[]; lastValidBlockHeight: number }> {
+  const withBuy = Boolean(devBuyLamports && devBuyLamports > 0n);
+  let input = i;
+  let table = null as Awaited<ReturnType<typeof loadLaunchTable>> | null;
+  if (withBuy) {
+    table = await loadLaunchTable(connection); // throws LutMissingError when dev buy is not set up
+    const sdk = new OnlinePumpSdk(connection);
+    const [global, feeConfig] = await Promise.all([sdk.fetchGlobal(), sdk.fetchFeeConfig()]);
+    const solAmount = new BN((devBuyLamports as bigint).toString());
+    // A coin that does not exist yet: quote from the starting curve.
+    const amount = getBuyTokenAmountFromSolAmount({
+      global,
+      feeConfig,
+      mintSupply: null,
+      bondingCurve: null,
+      amount: solAmount,
+      quoteMint: NATIVE_MINT,
+    });
+    if (amount.lten(0)) throw new Error("Dev buy amount is too small");
+    input = { ...i, devBuy: { global, amount, solAmount } };
+  }
+  const { create, share } = await buildLaunchInstructions(input);
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-
-  const mk = (ixs: TransactionInstruction[]) => {
-    const tx = new Transaction({ feePayer: i.creator, blockhash, lastValidBlockHeight });
-    tx.add(...ixs);
-    return tx;
-  };
 
   // The mint signs on the client AFTER the wallet. Wallets such as Phantom may rewrite the
   // message when signing, which would wipe a signature added earlier.
   void mintKeypair;
-  const tx1 = mk(create);
-  const tx2 = mk(share);
-  return [tx1, tx2];
+
+  let tx1: Transaction | VersionedTransaction;
+  if (withBuy && table) {
+    // Create + dev buy in ONE transaction, so nobody can snipe the coin before the creator buys.
+    const msg = new TransactionMessage({ payerKey: i.creator, recentBlockhash: blockhash, instructions: create }).compileToV0Message([table]);
+    const v = new VersionedTransaction(msg);
+    if (v.serialize().length > 1232) throw new TooLargeError();
+    tx1 = v;
+  } else {
+    const t = new Transaction({ feePayer: i.creator, blockhash, lastValidBlockHeight });
+    t.add(...create);
+    tx1 = t;
+  }
+  const tx2 = new Transaction({ feePayer: i.creator, blockhash, lastValidBlockHeight });
+  tx2.add(...share);
+  return { txs: [tx1, tx2], lastValidBlockHeight };
 }
 
 export type VerifyResult = {

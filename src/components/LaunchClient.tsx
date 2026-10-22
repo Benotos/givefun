@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Keypair, Transaction } from "@solana/web3.js";
+import { Keypair, Transaction, VersionedTransaction } from "@solana/web3.js";
 import { ConnectionProvider, WalletProvider, useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletModalProvider, WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import "@solana/wallet-adapter-react-ui/styles.css";
@@ -54,6 +54,7 @@ function Form({ charities, platformBps, paused }: Props) {
   const [website, setWebsite] = useState("");
   const [twitter, setTwitter] = useState("");
   const [telegram, setTelegram] = useState("");
+  const [devBuy, setDevBuy] = useState("");
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [slug, setSlug] = useState(charities[0]?.slug ?? "");
@@ -102,7 +103,7 @@ function Form({ charities, platformBps, paused }: Props) {
     }
   };
 
-  async function sendAndConfirm(tx: Transaction, lastValid: number) {
+  async function sendAndConfirm(tx: Transaction | VersionedTransaction, lastValid: number) {
     const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
     await confirmByPolling(connection, sig, lastValid);
     return sig;
@@ -188,8 +189,9 @@ function Form({ charities, platformBps, paused }: Props) {
     if (!image) return setErr("Add an image");
     try {
       const bal = await connection.getBalance(publicKey, "confirmed");
-      if (bal < 25_000_000) {
-        return setErr(`Your wallet has ${(bal / 1e9).toFixed(4)} SOL. A launch needs about 0.03 SOL. Add SOL first so nothing is wasted.`);
+      const need = 25_000_000 + Math.round((Number(devBuy) || 0) * 1e9) * 1.03;
+      if (bal < need) {
+        return setErr(`Your wallet has ${(bal / 1e9).toFixed(4)} SOL. This launch needs about ${(need / 1e9).toFixed(3)} SOL. Add SOL first so nothing is wasted.`);
       }
     } catch { /* balance check is best effort */ }
     let ticket = "";
@@ -204,6 +206,7 @@ function Form({ charities, platformBps, paused }: Props) {
       fd.append("website", website);
       fd.append("twitter", twitter);
       fd.append("telegram", telegram);
+      fd.append("devBuy", devBuy);
       fd.append("charitySlug", slug);
       fd.append("charityPercent", String(pctClamped));
       fd.append("image", image);
@@ -217,10 +220,16 @@ function Form({ charities, platformBps, paused }: Props) {
       mint = j.mint;
 
       setStage("sign");
-      const txs = (j.transactions as string[]).map((b) => Transaction.from(Buffer.from(b, "base64")));
-      const signed = await signAllTransactions(txs);
+      const flags = (j.versioned as boolean[]) ?? [];
+      const txs = (j.transactions as string[]).map((b, n) =>
+        flags[n] ? VersionedTransaction.deserialize(Buffer.from(b, "base64")) : Transaction.from(Buffer.from(b, "base64")),
+      );
+      const signed = await signAllTransactions(txs as Transaction[]);
       // Mint signs after the wallet so the wallet cannot invalidate it.
-      signed[0].partialSign(Keypair.fromSecretKey(Uint8Array.from(Buffer.from(j.mintSecret as string, "base64"))));
+      const mintKp = Keypair.fromSecretKey(Uint8Array.from(Buffer.from(j.mintSecret as string, "base64")));
+      const first = signed[0] as Transaction | VersionedTransaction;
+      if (first instanceof VersionedTransaction) first.sign([mintKp]);
+      else first.partialSign(mintKp);
 
       setStage("create");
       const firstSig = await sendAndConfirm(signed[0], j.lastValidBlockHeights[0]);
@@ -319,6 +328,18 @@ function Form({ charities, platformBps, paused }: Props) {
               <label className="label" htmlFor="tg">Telegram (optional)</label>
               <input id="tg" className="input" value={telegram} onChange={(e) => setTelegram(e.target.value)} maxLength={200} placeholder="t.me/yourgroup" />
             </div>
+          </div>
+          <div>
+            <label className="label" htmlFor="devbuy">Dev buy in SOL (optional)</label>
+            <div className="flex flex-wrap items-center gap-2">
+              <input id="devbuy" className="input max-w-[10rem]" type="number" inputMode="decimal" min="0" max="10" step="0.01" value={devBuy} onChange={(e) => setDevBuy(e.target.value)} placeholder="0" />
+              {["0.1", "0.5", "1"].map((v) => (
+                <button key={v} type="button" onClick={() => setDevBuy(v)} className={`rounded-full border px-3 py-1.5 text-xs transition ${devBuy === v ? "border-ember bg-ember/10 text-cream" : "border-line text-mute hover:text-cream"}`}>
+                  {v} SOL
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-xs text-faint">Buys your own coin in the same transaction as the launch, before anyone else can. Leave empty for no dev buy.</p>
           </div>
           <div>
             <label className="label" htmlFor="img">Image (png, jpg, gif or webp, max 2MB)</label>

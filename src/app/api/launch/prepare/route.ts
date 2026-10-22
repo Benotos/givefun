@@ -1,8 +1,9 @@
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { Keypair, PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { MIN_CHARITY_BPS, MAX_CHARITY_BPS, platformBps, platformWallet } from "@/lib/config";
 import { isSelectable, loadCharitiesFresh } from "@/lib/charities";
 import { computeShares } from "@/lib/shares";
-import { buildLaunchTransactions } from "@/lib/pump";
+import { buildLaunchTransactions, TooLargeError } from "@/lib/pump";
+import { LutMissingError } from "@/lib/lut";
 import { getConnection } from "@/lib/rpc";
 import { signTicket } from "@/lib/token";
 import { noStore } from "@/lib/http";
@@ -15,6 +16,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const MAX_IMG = 2 * 1024 * 1024;
+const MAX_DEV_BUY_SOL = 10;
 const IMG_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
 // Accepts a full https link, or for X and Telegram a bare handle. Returns "" when empty, null when invalid.
@@ -65,6 +67,11 @@ export async function POST(req: Request) {
   if (website === null) return bad("Website link is not valid");
   if (twitter === null) return bad("X link is not valid");
   if (telegram === null) return bad("Telegram link is not valid");
+  const devBuyRaw = String(form.get("devBuy") ?? "").trim();
+  const devBuySol = devBuyRaw === "" ? 0 : Number(devBuyRaw);
+  if (!Number.isFinite(devBuySol) || devBuySol < 0 || devBuySol > MAX_DEV_BUY_SOL)
+    return bad(`Dev buy must be between 0 and ${MAX_DEV_BUY_SOL} SOL`);
+  const devBuyLamports = BigInt(Math.round(devBuySol * 1e9));
   const charitySlug = String(form.get("charitySlug") ?? "");
   const charityBps = Math.round(Number(form.get("charityPercent")) * 100);
   const image = form.get("image");
@@ -121,10 +128,11 @@ export async function POST(req: Request) {
 
   const mintKp = Keypair.generate();
   try {
-    const txs = await buildLaunchTransactions(
+    const built = await buildLaunchTransactions(
       getConnection(),
       { creator, mint: mintKp.publicKey, name, symbol, uri, shares },
       mintKp,
+      devBuyLamports,
     );
 
     const ticket = signTicket({
@@ -143,11 +151,16 @@ export async function POST(req: Request) {
       // One time throwaway key for this coin. It holds no funds. The browser signs with it after the wallet.
       mintSecret: Buffer.from(mintKp.secretKey).toString("base64"),
       ticket,
-      lastValidBlockHeights: txs.map((t) => t.lastValidBlockHeight ?? 0),
-      transactions: txs.map((t) => t.serialize({ requireAllSignatures: false }).toString("base64")),
+      lastValidBlockHeights: built.txs.map(() => built.lastValidBlockHeight),
+      versioned: built.txs.map((t) => t instanceof VersionedTransaction),
+      transactions: built.txs.map((t) =>
+        (t instanceof VersionedTransaction ? Buffer.from(t.serialize()) : t.serialize({ requireAllSignatures: false })).toString("base64"),
+      ),
       split: shares.map((s) => ({ address: s.address.toBase58(), bps: s.shareBps })),
     });
   } catch (e) {
+    if (e instanceof LutMissingError) return bad("Dev buy is not available yet. Set it to 0 to launch.", 503);
+    if (e instanceof TooLargeError) return bad("Your name or ticker is too long to include a dev buy. Shorten it, or set the dev buy to 0.", 400);
     console.error("build launch failed", (e as Error).message);
     return bad("Could not build launch transaction", 500);
   }
