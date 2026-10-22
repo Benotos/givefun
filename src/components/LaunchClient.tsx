@@ -150,6 +150,33 @@ function Form({ charities, platformBps, paused }: Props) {
     }
   }
 
+  // Shrinks big images in the browser so the upload stays far below the host body limit.
+  async function pickImage(f: File | null) {
+    setErr("");
+    if (!f) return setImage(null);
+    const LIMIT = 1.8 * 1024 * 1024;
+    if (f.type === "image/gif") {
+      if (f.size > LIMIT) { setImage(null); return setErr("GIF is too large. Use one under 2MB."); }
+      return setImage(f);
+    }
+    try {
+      const bmp = await createImageBitmap(f);
+      const scale = Math.min(1, 1000 / Math.max(bmp.width, bmp.height));
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(bmp.width * scale));
+      c.height = Math.max(1, Math.round(bmp.height * scale));
+      c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
+      let blob: Blob | null = await new Promise((r) => c.toBlob(r, "image/png"));
+      if (!blob || blob.size > LIMIT) blob = await new Promise((r) => c.toBlob(r, "image/webp", 0.85));
+      if (!blob || blob.size > LIMIT) blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.8));
+      if (!blob || blob.size > LIMIT) { setImage(null); return setErr("Image is too large. Use a smaller one."); }
+      const ext = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
+      setImage(new File([blob], `coin.${ext}`, { type: blob.type }));
+    } catch {
+      f.size > LIMIT ? (setImage(null), setErr("Image is too large. Use one under 2MB.")) : setImage(f);
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr("");
@@ -168,8 +195,11 @@ function Form({ charities, platformBps, paused }: Props) {
       fd.append("charityPercent", String(pctClamped));
       fd.append("image", image);
       const res = await fetch("/api/launch/prepare", { method: "POST", body: fd });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error || "Prepare failed");
+      const raw = await res.text();
+      let j: any = {};
+      try { j = JSON.parse(raw); } catch { /* not json */ }
+      if (res.status === 413) throw new Error("Image is too large. Use one under 2MB.");
+      if (!res.ok) throw new Error(j.error || `Prepare failed (${res.status})`);
       ticket = j.ticket;
       mint = j.mint;
 
@@ -270,7 +300,7 @@ function Form({ charities, platformBps, paused }: Props) {
               className="input file:mr-3 file:rounded-lg file:border-0 file:bg-ember file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-ink"
               type="file"
               accept="image/png,image/jpeg,image/gif,image/webp"
-              onChange={(e) => setImage(e.target.files?.[0] ?? null)}
+              onChange={(e) => void pickImage(e.target.files?.[0] ?? null)}
               required
             />
           </div>
