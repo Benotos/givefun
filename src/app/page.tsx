@@ -8,6 +8,9 @@ import Icon from "@/components/Icon";
 import LiveFeed from "@/components/LiveFeed";
 import Reveal from "@/components/Reveal";
 import Ticker from "@/components/Ticker";
+import CopyButton from "@/components/CopyButton";
+import XIcon from "@/components/XIcon";
+import { GIVEFUN_CA, X_URL, X_HANDLE } from "@/lib/config";
 import { getCharities, getHome } from "@/lib/data";
 
 export const revalidate = 10;
@@ -58,7 +61,20 @@ export default async function Home() {
             </Link>
           </div>
 
-          <div className="mx-auto mt-14 max-w-xl animate-fadeUp rounded-3xl border border-line bg-panel/70 p-6 shadow-lift backdrop-blur [animation-delay:320ms]">
+          <div className="mx-auto mt-10 flex max-w-xl animate-fadeUp flex-col gap-3 [animation-delay:280ms] sm:flex-row sm:items-stretch">
+            <div className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-2xl border border-line bg-panel/70 px-4 py-3 backdrop-blur">
+              <div className="min-w-0 text-left">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-faint">$GIVEFUN CA</div>
+                <div className="mono truncate text-sm text-cream">{GIVEFUN_CA || "Coming soon"}</div>
+              </div>
+              {GIVEFUN_CA && <CopyButton text={GIVEFUN_CA} />}
+            </div>
+            <a href={X_URL} target="_blank" rel="noreferrer" className="btn-ghost inline-flex items-center justify-center gap-2 px-5 py-3 text-sm">
+              <XIcon size={14} /> {X_HANDLE}
+            </a>
+          </div>
+
+          <div className="mx-auto mt-6 max-w-xl animate-fadeUp rounded-3xl border border-line bg-panel/70 p-6 shadow-lift backdrop-blur [animation-delay:320ms]">
             <div className="font-display text-5xl font-extrabold tracking-tight text-amber sm:text-6xl">
               <Counter value={sol} decimals={2} />
               <span className="ml-2 text-2xl text-cream sm:text-3xl">SOL</span>

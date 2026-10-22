@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import Logo from "./Logo";
 import Icon from "./Icon";
+import XIcon from "./XIcon";
+import { X_URL } from "@/lib/config";
 
 const NAV = [
   { href: "/charities", label: "Charities" },
@@ -25,7 +27,10 @@ export default function Header() {
               {n.label}
             </Link>
           ))}
-          <Link href="/launch" className="btn btn-sm ml-2">
+          <a href={X_URL} target="_blank" rel="noreferrer" aria-label="give.fun on X" className="rounded-lg p-2.5 text-mute transition hover:text-cream">
+            <XIcon size={16} />
+          </a>
+          <Link href="/launch" className="btn btn-sm ml-1">
             Launch a coin <Icon name="arrow" size={14} />
           </Link>
         </nav>
@@ -48,6 +53,9 @@ export default function Header() {
                 {n.label}
               </Link>
             ))}
+            <a href={X_URL} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-lg px-3 py-3 text-base text-cream hover:bg-white/5">
+              <XIcon size={16} /> Follow on X
+            </a>
             <Link href="/launch" onClick={() => setOpen(false)} className="btn mt-2">
               Launch a coin
             </Link>

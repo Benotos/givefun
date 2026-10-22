@@ -4,6 +4,11 @@ export const SITE = {
   domain: "give.fun",
 };
 
+export const X_URL = "https://x.com/GiveDotFun_";
+export const X_HANDLE = "@GiveDotFun_";
+// Set NEXT_PUBLIC_GIVEFUN_CA in Vercel once the give.fun coin exists. Empty shows "Coming soon".
+export const GIVEFUN_CA = (process.env.NEXT_PUBLIC_GIVEFUN_CA || "").trim();
+
 export const MIN_CHARITY_BPS = 5000; // 50%
 export const MAX_CHARITY_BPS = 10000; // 100%
 

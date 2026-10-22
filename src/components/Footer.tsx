@@ -1,5 +1,7 @@
 import Link from "next/link";
 import Logo from "./Logo";
+import XIcon from "./XIcon";
+import { X_URL, X_HANDLE } from "@/lib/config";
 
 export default function Footer() {
   return (
@@ -17,6 +19,7 @@ export default function Footer() {
             <li><Link className="hover:text-cream" href="/charities">Charities</Link></li>
             <li><Link className="hover:text-cream" href="/how-it-works">How it works</Link></li>
             <li><Link className="hover:text-cream" href="/launch">Launch a coin</Link></li>
+            <li><a className="inline-flex items-center gap-2 hover:text-cream" href={X_URL} target="_blank" rel="noreferrer"><XIcon size={13} /> {X_HANDLE}</a></li>
           </ul>
         </div>
         <div className="text-sm">
