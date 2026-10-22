@@ -1,16 +1,13 @@
 // Wide, category-led cover photography for charity cards.
-// Unsplash images below are published under the Unsplash License.
-// The photos are illustrative category imagery, not claims that a photo depicts the named charity.
+// Unsplash photos are used as illustrative category imagery, not as claims that a photo depicts the named charity.
 const COVERS = {
-  animals: "https://images.unsplash.com/photo-1654053284918-42dadb960669?auto=format&fit=crop&w=1400&q=80",
+  animals: "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=1400&q=80",
   community: "https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?auto=format&fit=crop&w=1400&q=80",
-  water: "https://images.unsplash.com/photo-1763688506555-c73c1b944080?auto=format&fit=crop&w=1400&q=80",
+  water: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1400&q=80",
   education: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=1400&q=80",
-  health: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=1400&q=80",
+  health: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=1400&q=80",
   ocean: "https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=1400&q=80",
 } as const;
-
-export type CharityCoverTheme = keyof typeof COVERS;
 
 /** Select a relevant cover from the charity's existing metadata, with a safe visual fallback. */
 export function charityCoverFor(input: { slug: string; name: string; cause?: string; blurb?: string }): string {
