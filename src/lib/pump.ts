@@ -85,8 +85,10 @@ export async function buildLaunchTransactions(
     return tx;
   };
 
+  // The mint signs on the client AFTER the wallet. Wallets such as Phantom may rewrite the
+  // message when signing, which would wipe a signature added earlier.
+  void mintKeypair;
   const tx1 = mk(create);
-  tx1.partialSign(mintKeypair);
   const tx2 = mk(share);
   return [tx1, tx2];
 }

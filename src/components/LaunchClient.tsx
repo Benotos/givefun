@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Transaction } from "@solana/web3.js";
+import { Keypair, Transaction } from "@solana/web3.js";
 import { ConnectionProvider, WalletProvider, useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletModalProvider, WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import "@solana/wallet-adapter-react-ui/styles.css";
@@ -176,6 +176,8 @@ function Form({ charities, platformBps, paused }: Props) {
       setStage("sign");
       const txs = (j.transactions as string[]).map((b) => Transaction.from(Buffer.from(b, "base64")));
       const signed = await signAllTransactions(txs);
+      // Mint signs after the wallet so the wallet cannot invalidate it.
+      signed[0].partialSign(Keypair.fromSecretKey(Uint8Array.from(Buffer.from(j.mintSecret as string, "base64"))));
 
       setStage("create");
       const firstSig = await sendAndConfirm(signed[0], j.lastValidBlockHeights[0]);

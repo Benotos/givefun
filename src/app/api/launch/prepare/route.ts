@@ -9,6 +9,7 @@ import { noStore } from "@/lib/http";
 import { guard } from "@/lib/ratelimit";
 import { getFlags } from "@/lib/data";
 import { store } from "@/lib/store";
+import { uploadMetadata, MetaError } from "@/lib/metadata";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -80,29 +81,17 @@ export async function POST(req: Request) {
     return bad((e as Error).message);
   }
 
-  // Upload metadata to pump.fun IPFS
+  // Upload image and metadata to IPFS (Pinata first if configured, pump.fun as fallback)
   let uri: string;
   let imageUrl: string | null = null;
   try {
-    const fd = new FormData();
-    fd.append("file", image);
-    fd.append("name", name);
-    fd.append("symbol", symbol);
-    fd.append("description", description);
-    fd.append("showName", "true");
-    const res = await fetch(process.env.METADATA_UPLOAD_URL || "https://pump.fun/api/ipfs", {
-      method: "POST",
-      body: fd,
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!res.ok) throw new Error(`metadata upload ${res.status}`);
-    const j = (await res.json()) as { metadataUri?: string; metadata?: { image?: string } };
-    if (!j.metadataUri) throw new Error("no metadataUri");
-    uri = j.metadataUri;
-    imageUrl = j.metadata?.image ?? null;
+    const m = await uploadMetadata({ file: image, name, symbol, description });
+    uri = m.uri;
+    imageUrl = m.imageUrl;
   } catch (e) {
-    console.error("metadata upload failed", (e as Error).message);
-    return bad("Could not upload metadata. Try again.", 502);
+    // The detail names the failing route and its HTTP status. It never contains keys.
+    const detail = e instanceof MetaError ? e.detail : "unknown";
+    return bad(`Could not upload metadata (${detail}). Try again.`, 502);
   }
 
   const mintKp = Keypair.generate();
@@ -126,6 +115,8 @@ export async function POST(req: Request) {
 
     return noStore({
       mint: mintKp.publicKey.toBase58(),
+      // One time throwaway key for this coin. It holds no funds. The browser signs with it after the wallet.
+      mintSecret: Buffer.from(mintKp.secretKey).toString("base64"),
       ticket,
       lastValidBlockHeights: txs.map((t) => t.lastValidBlockHeight ?? 0),
       transactions: txs.map((t) => t.serialize({ requireAllSignatures: false }).toString("base64")),
