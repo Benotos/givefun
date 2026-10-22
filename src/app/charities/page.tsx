@@ -23,7 +23,7 @@ export default async function Charities() {
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {live.length === 0 && <div className="card col-span-full p-10 text-center text-mute">No verified charities yet.</div>}
         {live.map((c, i) => (
-          <Reveal key={c.slug} delay={(i % 3) * 70}>
+          <Reveal key={c.slug} delay={(i % 3) * 70} className="h-full">
             <CharityCard c={c} />
           </Reveal>
         ))}
