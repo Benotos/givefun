@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-ink font-sans text-cream antialiased;
+  background-image:
+    radial-gradient(70rem 36rem at 80% -10%, rgba(255, 106, 69, 0.1), transparent 60%),
+    radial-gradient(50rem 30rem at -10% 10%, rgba(255, 199, 102, 0.06), transparent 60%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgba(255, 106, 69, 0.4);
+}
+
+:focus-visible {
+  outline: 2px solid #ff6a45;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+@layer base {
+  h1, h2, h3, h4 {
+    @apply font-display tracking-tight;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-line bg-panel shadow-lift;
+  }
+  .card-hover {
+    @apply transition duration-300 hover:-translate-y-0.5 hover:border-ember/40;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-ember px-5 py-3 text-sm font-semibold text-ink transition duration-200 hover:brightness-110 hover:shadow-glow active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-none;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-white/[0.02] px-5 py-3 text-sm font-medium text-cream transition duration-200 hover:border-mute/50 hover:bg-white/[0.05] active:scale-[0.98];
+  }
+  .btn-sm {
+    @apply !px-3.5 !py-2 !text-xs;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.03] px-2.5 py-1 text-xs text-mute;
+  }
+  .input {
+    @apply w-full rounded-xl border border-line bg-ink/60 px-3.5 py-3 text-sm text-cream outline-none transition placeholder:text-faint focus:border-ember/60 focus:ring-2 focus:ring-ember/20;
+  }
+  .label {
+    @apply mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-mute;
+  }
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.22em] text-ember;
+  }
+  .h-section {
+    @apply font-display text-3xl font-bold sm:text-4xl;
+  }
+  .mono {
+    @apply font-mono text-[12px] tracking-tight;
+  }
+  .skeleton {
+    @apply animate-shimmer rounded-lg bg-[linear-gradient(110deg,#1a1714_8%,#262019_18%,#1a1714_33%)] bg-[length:200%_100%];
+  }
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+/* Wallet adapter modal, tuned to the theme */
+.wallet-adapter-button {
+  font-family: inherit !important;
+  border-radius: 12px !important;
+  font-size: 13px !important;
+  height: 42px !important;
+}
+.wallet-adapter-button-trigger {
+  background: #ff6a45 !important;
+  color: #0b0a09 !important;
+  font-weight: 600 !important;
+}
+.wallet-adapter-modal-wrapper {
+  background: #13110f !important;
+  border: 1px solid #2a2520;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
