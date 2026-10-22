@@ -9,7 +9,9 @@ export async function confirmByPolling(
   conn: Connection,
   signature: string,
   lastValidBlockHeight: number,
-  timeoutMs = 60_000,
+  timeoutMs = 90_000,
+  /** Called every few seconds while waiting. Resending the same signed bytes is safe and gets a dropped transaction through. */
+  rebroadcast?: () => Promise<unknown>,
 ): Promise<void> {
   const start = Date.now();
   let loop = 0;
@@ -24,6 +26,7 @@ export async function confirmByPolling(
       const bh = await conn.getBlockHeight("confirmed");
       if (bh > lastValidBlockHeight) throw new Error("Transaction expired, please try again");
     }
+    if (rebroadcast && loop % 2 === 1) await rebroadcast().catch(() => undefined);
     loop++;
     await sleep(1500);
   }

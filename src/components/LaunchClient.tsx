@@ -104,8 +104,10 @@ function Form({ charities, platformBps, paused }: Props) {
   };
 
   async function sendAndConfirm(tx: Transaction | VersionedTransaction, lastValid: number) {
-    const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
-    await confirmByPolling(connection, sig, lastValid);
+    const raw = tx.serialize();
+    const sig = await connection.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 3 });
+    // Keep resending the same signed bytes until it lands or the blockhash expires, so a busy network does not drop it.
+    await confirmByPolling(connection, sig, lastValid, 90_000, () => connection.sendRawTransaction(raw, { skipPreflight: true, maxRetries: 0 }));
     return sig;
   }
 
@@ -129,24 +131,29 @@ function Form({ charities, platformBps, paused }: Props) {
     throw new Error("Launched, but verification is still pending. It will appear shortly.");
   }
 
+  // Asks the server for a lock transaction with a fresh blockhash and has the wallet sign it.
+  async function lockFresh(ticket: string) {
+    if (!signTransaction) throw new Error("Wallet cannot sign");
+    setStage("prepare");
+    const res = await fetch("/api/launch/resume", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticket }),
+    });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error || "Could not resume");
+    if (j.status === "already_locked") return;
+    setStage("sign");
+    const signed = await signTransaction(Transaction.from(Buffer.from(j.transaction, "base64")));
+    setStage("lock");
+    await sendAndConfirm(signed, j.lastValidBlockHeight);
+  }
+
   async function retryLock() {
-    if (!pending || !signTransaction) return;
+    if (!pending) return;
     setErr("");
     try {
-      setStage("prepare");
-      const res = await fetch("/api/launch/resume", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticket: pending.ticket }),
-      });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error || "Could not resume");
-      if (j.status !== "already_locked") {
-        setStage("sign");
-        const signed = await signTransaction(Transaction.from(Buffer.from(j.transaction, "base64")));
-        setStage("lock");
-        await sendAndConfirm(signed, j.lastValidBlockHeight);
-      }
+      await lockFresh(pending.ticket);
       await registerUntilVerified(pending.ticket, pending.mint, "");
     } catch (e) {
       setErr((e as Error).message || "Something went wrong");
@@ -196,6 +203,7 @@ function Form({ charities, platformBps, paused }: Props) {
     } catch { /* balance check is best effort */ }
     let ticket = "";
     let mint = "";
+    let created = false;
     try {
       setStage("prepare");
       const fd = new FormData();
@@ -233,18 +241,34 @@ function Form({ charities, platformBps, paused }: Props) {
 
       setStage("create");
       const firstSig = await sendAndConfirm(signed[0], j.lastValidBlockHeights[0]);
+      created = true;
       savePending({ ticket, mint, at: Date.now() });
 
       setStage("lock");
-      await sendAndConfirm(signed[1], j.lastValidBlockHeights[1]);
+      // The lock transaction was signed before the coin was created. If the first step took long and its
+      // blockhash is about to expire, ask for a fresh one instead of sending a transaction that will fail.
+      let nearExpiry = false;
+      try {
+        nearExpiry = (await connection.getBlockHeight("confirmed")) > j.lastValidBlockHeights[1] - 30;
+      } catch { /* best effort */ }
+      if (nearExpiry) {
+        await lockFresh(ticket);
+      } else {
+        try {
+          await sendAndConfirm(signed[1], j.lastValidBlockHeights[1]);
+        } catch (e3) {
+          if (!/expired/i.test((e3 as Error).message)) throw e3;
+          await lockFresh(ticket);
+        }
+      }
 
       await registerUntilVerified(ticket, mint, firstSig);
     } catch (e2) {
       const msg = (e2 as Error).message || "Something went wrong";
       setErr(
-        ticket && pending === null && stage !== "prepare" && stage !== "sign"
-          ? `${msg} Your coin may exist but the charity split is not locked yet. Use Retry lock below.`
-          : msg,
+        created
+          ? `${msg} Your coin exists but the charity split is not locked yet. Use Retry lock below.`
+          : `${msg} The coin was not confirmed on chain. Check your wallet history before trying again.`,
       );
     } finally {
       setStage("idle");
