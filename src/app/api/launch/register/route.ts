@@ -76,5 +76,7 @@ export async function POST(req: Request) {
 
   // Clear any cached "not found" so the coin page works the moment the user is redirected.
   await invalidateSnapshot(`coin:${t.mint}`);
+  // Same for the lists, so a verified coin shows on Explore and Home straight away.
+  if (v.ok) await Promise.all([invalidateSnapshot("explore"), invalidateSnapshot("home")]);
   return noStore({ status: v.ok ? "verified" : "pending", mint: t.mint, reasons: v.reasons }, v.ok ? 200 : 202);
 }

@@ -75,6 +75,17 @@ export async function buildLaunchInstructions(i: LaunchIxInput): Promise<{
         }),
       ];
 
+  // Any trade before the split exists (including the dev buy) leaves creator fees on the curve.
+  // pump.fun refuses the creator change (error 6095) until they are swept, so sweep first, same transaction.
+  // It is permissionless and harmless when there is nothing to sweep.
+  const sweepIx = await PUMP_SDK.sweepCreatorFeeInstruction({
+    payer: i.creator,
+    mint: i.mint,
+    creator: i.creator,
+    quoteMint: NATIVE_MINT,
+    quoteTokenProgram: TOKEN_PROGRAM_ID,
+  });
+
   const cfgIx = await PUMP_SDK.createFeeSharingConfig({
     creator: i.creator,
     mint: i.mint,
@@ -99,7 +110,7 @@ export async function buildLaunchInstructions(i: LaunchIxInput): Promise<{
       ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 200_000 }),
       ...createIxs,
     ],
-    share: [ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }), ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 200_000 }), cfgIx, updIx],
+    share: [ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }), ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 200_000 }), sweepIx, cfgIx, updIx],
   };
 }
 
