@@ -13,6 +13,7 @@ export type WorkerBeat = {
   lastTick: { coins: number; verified: number; revoked: number; failed: number; distributed: number; errors: number } | null;
   lastError: string;
   snapshotErrors: number;
+  mode?: "loop" | "once";
 };
 
 export async function getSystemStatus() {
@@ -40,7 +41,7 @@ export async function getSystemStatus() {
     rpc: rpcStatus(),
     snapshots: { home: homeAge, charities: charAge, flags: flagsAge, stats: { ...snapStats } },
     worker: beat
-      ? { alive: Date.now() - beat.at < 45_000, ageMs: Date.now() - beat.at, ...beat }
+      ? { alive: Date.now() - beat.at < (beat.mode === "once" ? 12 * 60_000 : 45_000), ageMs: Date.now() - beat.at, ...beat }
       : null,
     counts,
     flags,

@@ -34,6 +34,7 @@ type Beat = {
   lastTick: TickStats | null;
   lastError: string;
   snapshotErrors: number;
+  mode: "loop" | "once";
 };
 
 async function main() {
@@ -60,6 +61,7 @@ async function main() {
     lastTick: null,
     lastError: "",
     snapshotErrors: 0,
+    mode: once ? "once" : "loop",
   };
 
   const publishBeat = async () => {
@@ -92,7 +94,10 @@ async function main() {
 
   await snapLoop();
   await chainLoop();
-  if (once) return;
+  if (once) {
+    // Scheduled mode (GitHub Actions). Exit explicitly so the job ends right away.
+    process.exit(0);
+  }
 
   // Never overlap runs of the same loop. A slow RPC must not stack up work.
   let snapBusy = false;

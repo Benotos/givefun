@@ -1,0 +1,34 @@
+# Free scheduled worker. Runs one verify and payout pass every 5 minutes.
+# Needs these repository secrets (Settings, Secrets and variables, Actions):
+#   DATABASE_URL, UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN, HELIUS_RPC_URL, WORKER_SECRET_KEY
+# Free minutes are unlimited on PUBLIC repos. On private repos this would exceed the free quota.
+name: worker
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: givefun-worker
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run worker:once
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          HELIUS_RPC_URL: ${{ secrets.HELIUS_RPC_URL }}
+          WORKER_SECRET_KEY: ${{ secrets.WORKER_SECRET_KEY }}
+          WORKER_MODE: once
