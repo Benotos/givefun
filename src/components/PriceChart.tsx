@@ -6,6 +6,10 @@ import { toCandles, TOTAL_SUPPLY, type Trade } from "@/lib/candles";
 // Our own chart. Trades are read from the chain by /api/candles, so a brand new coin charts from its first trade.
 // Y axis is market cap in SOL (price times the 1 billion supply every pump.fun coin has).
 const TFS = [
+  { k: "1s", s: 1 },
+  { k: "5s", s: 5 },
+  { k: "15s", s: 15 },
+  { k: "30s", s: 30 },
   { k: "1m", s: 60 },
   { k: "5m", s: 300 },
   { k: "15m", s: 900 },
@@ -26,10 +30,28 @@ export default function PriceChart({ mint, symbol }: { mint: string; symbol: str
   const chart = useRef<IChartApi | null>(null);
   const candleS = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volS = useRef<ISeriesApi<"Histogram"> | null>(null);
-  const [tf, setTf] = useState(TFS[1]);
+  const [tf, setTf] = useState(TFS[5]);
   const [trades, setTrades] = useState<Trade[] | null>(null);
   const [failed, setFailed] = useState(false);
   const pump = `https://pump.fun/coin/${mint}`;
+
+  // Remember the chosen timeframe for the next chart, in this browser.
+  useEffect(() => {
+    try {
+      const saved = TFS.find((t) => t.k === localStorage.getItem("givefun:tf"));
+      if (saved) setTf(saved);
+    } catch {
+      /* storage blocked, keep the default */
+    }
+  }, []);
+  function pickTf(t: (typeof TFS)[number]) {
+    setTf(t);
+    try {
+      localStorage.setItem("givefun:tf", t.k);
+    } catch {
+      /* ignore */
+    }
+  }
 
   // create the chart once
   useEffect(() => {
@@ -90,6 +112,7 @@ export default function PriceChart({ mint, symbol }: { mint: string; symbol: str
     const { candles, volume } = toCandles(scaled, tf.s);
     candleS.current.setData(candles.map((c) => ({ ...c, time: c.time as UTCTimestamp })));
     volS.current.setData(volume.map((v) => ({ time: v.time as UTCTimestamp, value: v.value, color: v.up ? "rgba(52,211,153,0.35)" : "rgba(251,113,133,0.35)" })));
+    chart.current?.applyOptions({ timeScale: { secondsVisible: tf.s < 60 } });
     chart.current?.timeScale().fitContent();
   }, [trades, tf]);
 
@@ -110,7 +133,7 @@ export default function PriceChart({ mint, symbol }: { mint: string; symbol: str
             {TFS.map((t) => (
               <button
                 key={t.k}
-                onClick={() => setTf(t)}
+                onClick={() => pickTf(t)}
                 className={`px-3 py-1.5 font-semibold ${tf.k === t.k ? "bg-raise text-white" : "text-mute hover:text-white"}`}
               >
                 {t.k}
