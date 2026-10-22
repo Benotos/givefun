@@ -6,7 +6,7 @@ import { feeSharingConfigPda } from "@pump-fun/pump-sdk";
 import { getCoinPage } from "@/lib/data";
 import { getCharity } from "@/lib/charities";
 import { fmtSol, shortAddr, timeAgo } from "@/lib/format";
-import { solscanAddr, solscanToken, solscanTx } from "@/lib/config";
+import { SITE_URL, solscanAddr, solscanToken, solscanTx } from "@/lib/config";
 import CoinAvatar from "@/components/CoinAvatar";
 import CopyButton from "@/components/CopyButton";
 import Counter from "@/components/Counter";
@@ -24,9 +24,13 @@ export async function generateMetadata({ params }: { params: { mint: string } })
   if (!BASE58.test(params.mint)) return { title: "Coin" };
   const d = await getCoinPage(params.mint);
   if (!d.found) return { title: "Coin" };
+  const title = `${d.coin.name} (${d.coin.symbol})`;
+  const description = `${d.coin.charity_bps / 100}% of creator fees go to charity, locked on chain.`;
   return {
-    title: `${d.coin.name} ($${d.coin.symbol})`,
-    description: `${d.coin.charity_bps / 100}% of creator fees go to charity, locked on chain.`,
+    title,
+    description,
+    alternates: { canonical: `/coin/${d.coin.mint}` },
+    openGraph: { title, description, url: `/coin/${d.coin.mint}`, type: "website" },
   };
 }
 
@@ -59,10 +63,9 @@ export default async function CoinPage({ params }: { params: { mint: string } })
     /* ignore */
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://give.fun";
   const tweet = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
     `${coin.name} sends ${coin.charity_bps / 100}% of its creator fees to ${charity?.name ?? "charity"}. Locked on chain.`,
-  )}&url=${encodeURIComponent(`${siteUrl}/coin/${coin.mint}`)}`;
+  )}&url=${encodeURIComponent(`${SITE_URL}/coin/${coin.mint}`)}`;
 
   const checks = [
     { ok: verified, t: "Split is locked on chain", d: "The dev cannot change who gets paid." },
