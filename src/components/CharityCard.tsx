@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { Charity } from "@/lib/charities";
 import { shortAddr } from "@/lib/format";
-import { charityCoverFor } from "@/data/charity-covers";
 import CopyButton from "./CopyButton";
+import CharityLogo from "./CharityLogo";
 import Icon from "./Icon";
 
 function safeExternalUrl(raw: string): string {
@@ -14,10 +14,9 @@ function safeExternalUrl(raw: string): string {
   }
 }
 
-// Photo-led charity cards with a wide cover, cause tag, raised total, and quick actions.
+// Charity cards use the charity's actual site logo/icon, never an unrelated stock photo.
 export default function CharityCard({ c, rank }: { c: Charity; rank?: number }) {
   const live = c.verified && c.active;
-  const cover = charityCoverFor({ slug: c.slug, name: c.name, cause: c.cause, blurb: c.blurb });
   const siteUrl = safeExternalUrl(c.site_url);
   const raised = (Number(c.lamports ?? 0) / 1_000_000_000).toLocaleString("en-US", {
     minimumFractionDigits: 2,
@@ -30,30 +29,34 @@ export default function CharityCard({ c, rank }: { c: Charity; rank?: number }) 
       <Link
         href={`/charity/${c.slug}`}
         aria-label={`View ${c.name} charity details`}
-        className="relative block h-32 shrink-0 overflow-hidden bg-raise"
+        className="relative block h-36 shrink-0 overflow-hidden border-b border-line bg-gradient-to-br from-panel via-raise to-ink"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={cover}
-          alt=""
-          loading="lazy"
-          className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink/95 via-ink/25 to-ink/25" />
-        <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-ink/70 to-transparent" />
-        <span className="absolute bottom-3 left-3 max-w-[70%] truncate rounded-full border border-white/15 bg-black/45 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
-          {category}
-        </span>
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,106,69,0.13),transparent_58%)]" />
+        <div className="relative flex h-full items-center gap-4 px-4 pt-4">
+          <CharityLogo
+            slug={c.slug}
+            name={c.name}
+            siteUrl={siteUrl}
+            size={76}
+            className="rounded-2xl border border-white/10 shadow-lg"
+          />
+          <div className="min-w-0 flex-1 pr-1">
+            <span className="inline-flex max-w-full truncate rounded-full border border-white/15 bg-black/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+              {category}
+            </span>
+            <div className="mt-2 text-xs text-mute">Official charity</div>
+          </div>
+        </div>
         <span
           className={`absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold backdrop-blur-sm ${
-            live ? "border-mint/30 bg-ink/65 text-mint" : "border-amber/30 bg-ink/65 text-amber"
+            live ? "border-mint/30 bg-ink/80 text-mint" : "border-amber/30 bg-ink/80 text-amber"
           }`}
         >
           <Icon name={live ? "shield" : "eye"} size={11} />
           {live ? "Verified" : "Pending"}
         </span>
         {rank !== undefined && (
-          <span className="absolute left-3 top-3 rounded-md bg-black/40 px-1.5 py-1 font-mono text-[10px] text-white/80">
+          <span className="absolute left-3 top-3 rounded-md border border-white/10 bg-black/40 px-1.5 py-1 font-mono text-[10px] text-white/80">
             #{rank}
           </span>
         )}
