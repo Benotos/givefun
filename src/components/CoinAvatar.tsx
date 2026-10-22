@@ -5,10 +5,13 @@ import { gradientFor } from "@/lib/format";
 // Public IPFS gateways are flaky for fresh pins, so try several before falling back to the gradient tile.
 const GATEWAYS = ["https://ipfs.io/ipfs/", "https://dweb.link/ipfs/", "https://gateway.pinata.cloud/ipfs/", "https://w3s.link/ipfs/"];
 
+// Your own dedicated gateway (Pinata gives one free). Tried first, so old coins load from it too.
+const OWN = (process.env.NEXT_PUBLIC_IPFS_GATEWAY || "").trim().replace(/\/+$/, "");
+
 function candidates(image: string): string[] {
   const m = image.match(/\/ipfs\/([A-Za-z0-9]+(?:\/[^?#]*)?)/);
   if (!m) return [image];
-  const list = [image, ...GATEWAYS.map((g) => g + m[1])];
+  const list = [...(OWN ? [`${OWN}/${m[1]}`] : []), image, ...GATEWAYS.map((g) => g + m[1])];
   return Array.from(new Set(list));
 }
 
