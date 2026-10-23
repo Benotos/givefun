@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createChart, type IChartApi, type ISeriesApi, type UTCTimestamp } from "lightweight-charts";
 import { toCandles, TOTAL_SUPPLY, type Trade } from "@/lib/candles";
+import CopyButton from "./CopyButton";
 
 // On-chain trades are denominated in SOL. Convert market cap to USD using the current SOL/USD
 // spot quote so the header and chart use the same currency.
@@ -176,8 +177,11 @@ export default function PriceChart({ mint, symbol }: { mint: string; symbol: str
   return (
     <section className="card overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:px-6">
-        <div>
-          <h2 className="font-display text-xl font-bold">${symbol} chart</h2>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-display text-xl font-bold">${symbol} chart</h2>
+            <CopyButton text={mint} label="Copy CA" />
+          </div>
           <div className="mt-0.5 text-xs text-mute">
             Market cap <b className="text-white">{marketCap}</b>
           </div>
