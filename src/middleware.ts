@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Kill switch. Set MAINTENANCE=1 in env and redeploy (or flip in Vercel and redeploy).
+// Production is temporarily offline by default. Set MAINTENANCE=0 to restore it.
+// Set MAINTENANCE=1 to enable maintenance mode on preview deployments too.
 // /api/health always works so uptime checks keep running.
 export function middleware(req: NextRequest) {
-  if (process.env.MAINTENANCE !== "1") return NextResponse.next();
+  const maintenance =
+    process.env.MAINTENANCE === "1" ||
+    (process.env.VERCEL_ENV === "production" && process.env.MAINTENANCE !== "0");
+  if (!maintenance) return NextResponse.next();
 
   const { pathname } = req.nextUrl;
   if (pathname === "/api/health") return NextResponse.next();
