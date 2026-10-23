@@ -1,6 +1,5 @@
 import {
   Connection,
-  Keypair,
   PublicKey,
   Transaction,
   TransactionInstruction,
@@ -116,12 +115,12 @@ export async function buildLaunchInstructions(i: LaunchIxInput): Promise<{
 
 /**
  * Online. Builds unsigned transactions for the dev wallet to sign.
- * The mint keypair partial signs the first transaction. We never hold the dev key or any funds.
+ * The client holds the mint keypair and partial-signs the create transaction after wallet signing.
+ * No mint secret key is accepted by or returned from this server module.
  */
 export async function buildLaunchTransactions(
   connection: Connection,
   i: LaunchIxInput,
-  mintKeypair: Keypair,
   devBuyLamports?: bigint,
 ): Promise<{ txs: (Transaction | VersionedTransaction)[]; lastValidBlockHeight: number }> {
   const withBuy = Boolean(devBuyLamports && devBuyLamports > 0n);
@@ -149,8 +148,6 @@ export async function buildLaunchTransactions(
 
   // The mint signs on the client AFTER the wallet. Wallets such as Phantom may rewrite the
   // message when signing, which would wipe a signature added earlier.
-  void mintKeypair;
-
   let tx1: Transaction | VersionedTransaction;
   if (withBuy && table) {
     // Create + dev buy in ONE transaction, so nobody can snipe the coin before the creator buys.
