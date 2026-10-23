@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import CharityCard from "@/components/CharityCard";
 import Reveal from "@/components/Reveal";
 import { getCharities } from "@/lib/charities";
+import { X_URL } from "@/lib/config";
+import Icon from "@/components/Icon";
+import XIcon from "@/components/XIcon";
 
 export const revalidate = 30;
 export const metadata: Metadata = { title: "Charities", description: "Every charity wallet is copied from the charity's own official page." };
@@ -39,6 +42,30 @@ export default async function Charities() {
           </div>
         </>
       )}
+
+      <section className="mt-16 overflow-hidden rounded-2xl border border-line bg-panel/60 px-5 py-6 sm:px-7 sm:py-7">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="max-w-2xl">
+            <div className="eyebrow">More coming soon</div>
+            <h2 className="mt-2 font-display text-xl font-bold sm:text-2xl">More charities are on the way.</h2>
+            <p className="mt-2 text-sm leading-6 text-mute">
+              We're reviewing more organisations and checking their official Solana donation wallets before listing them.
+            </p>
+          </div>
+          <div className="shrink-0 sm:max-w-xs">
+            <p className="mb-3 text-sm font-semibold text-cream">Want your charity listed on Give.fun?</p>
+            <a
+              href={X_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-ghost inline-flex w-full items-center justify-center gap-2 px-4 py-3 text-sm"
+            >
+              <XIcon size={14} /> Apply to become a partner <Icon name="external" size={13} />
+            </a>
+            <p className="mt-2 text-xs leading-5 text-faint">Reach out on X to start the verification process.</p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
