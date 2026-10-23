@@ -18,12 +18,21 @@ export default function Header() {
   const [open, setOpen] = useState(false);
   return (
     <header className="sticky top-0 z-50 border-b border-line/60 bg-ink/75 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+      <div className="relative mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         <Link href="/" aria-label="give.fun home" onClick={() => setOpen(false)}>
           <Logo />
         </Link>
 
-        <nav className="hidden items-center gap-1 sm:flex">
+        <nav aria-label="Primary navigation" className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 lg:flex">
+          {NAV.map((n) => (
+            <Link key={n.href} href={n.href} className="rounded-lg px-3.5 py-2 text-sm text-mute transition hover:text-cream">
+              {n.label}
+            </Link>
+          ))}
+        </nav>
+
+        {/* Keep the compact, right-aligned nav at intermediate widths to avoid collisions. */}
+        <nav aria-label="Site navigation" className="ml-auto hidden items-center gap-1 sm:flex lg:hidden">
           {NAV.map((n) => (
             <Link key={n.href} href={n.href} className="rounded-lg px-3.5 py-2 text-sm text-mute transition hover:text-cream">
               {n.label}
@@ -36,6 +45,15 @@ export default function Header() {
             Launch a coin <Icon name="arrow" size={14} />
           </Link>
         </nav>
+
+        <div className="ml-auto hidden items-center gap-1 lg:flex">
+          <a href={X_URL} target="_blank" rel="noreferrer" aria-label="give.fun on X" className="rounded-lg p-2.5 text-mute transition hover:text-cream">
+            <XIcon size={16} />
+          </a>
+          <Link href="/launch" className="btn btn-sm ml-1">
+            Launch a coin <Icon name="arrow" size={14} />
+          </Link>
+        </div>
 
         <button
           className="rounded-lg border border-line p-2 text-cream sm:hidden"
