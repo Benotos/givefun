@@ -1,4 +1,4 @@
-import { Keypair, PublicKey, VersionedTransaction } from "@solana/web3.js";
+import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { MIN_CHARITY_BPS, MAX_CHARITY_BPS, platformBps, platformWallet } from "@/lib/config";
 import { isSelectable, loadCharitiesFresh } from "@/lib/charities";
 import { computeShares } from "@/lib/shares";
@@ -58,6 +58,7 @@ export async function POST(req: Request) {
   }
 
   const creatorStr = String(form.get("creator") ?? "");
+  const mintStr = String(form.get("mint") ?? "").trim();
   const name = String(form.get("name") ?? "").trim();
   const symbol = String(form.get("symbol") ?? "").trim().toUpperCase();
   const description = String(form.get("description") ?? "").trim().slice(0, 500);
@@ -77,11 +78,18 @@ export async function POST(req: Request) {
   const image = form.get("image");
 
   let creator: PublicKey;
+  let mint: PublicKey;
   try {
     creator = new PublicKey(creatorStr);
   } catch {
     return bad("Invalid wallet");
   }
+  try {
+    mint = new PublicKey(mintStr);
+  } catch {
+    return bad("Invalid mint address");
+  }
+  if (!mint.toBase58().endsWith("pump")) return bad('Mint address must end in "pump". Generate a new Pump-style address and retry.');
   if (name.length < 1 || name.length > 32) return bad("Name must be 1 to 32 characters");
   if (!/^[A-Z0-9]{1,10}$/.test(symbol)) return bad("Symbol must be 1 to 10 letters or numbers");
   if (!Number.isFinite(charityBps) || charityBps < MIN_CHARITY_BPS || charityBps > MAX_CHARITY_BPS)
@@ -126,17 +134,15 @@ export async function POST(req: Request) {
     return bad(`Could not upload metadata (${detail}). Try again.`, 502);
   }
 
-  const mintKp = Keypair.generate();
   try {
     const built = await buildLaunchTransactions(
       getConnection(),
-      { creator, mint: mintKp.publicKey, name, symbol, uri, shares },
-      mintKp,
+      { creator, mint, name, symbol, uri, shares },
       devBuyLamports,
     );
 
     const ticket = signTicket({
-      mint: mintKp.publicKey.toBase58(),
+      mint: mint.toBase58(),
       creator: creator.toBase58(),
       name,
       symbol,
@@ -147,9 +153,8 @@ export async function POST(req: Request) {
     });
 
     return noStore({
-      mint: mintKp.publicKey.toBase58(),
-      // One time throwaway key for this coin. It holds no funds. The browser signs with it after the wallet.
-      mintSecret: Buffer.from(mintKp.secretKey).toString("base64"),
+      mint: mint.toBase58(),
+      // The browser generated and retains the vanity mint keypair. Only the public address is sent here.
       ticket,
       lastValidBlockHeights: built.txs.map(() => built.lastValidBlockHeight),
       versioned: built.txs.map((t) => t instanceof VersionedTransaction),

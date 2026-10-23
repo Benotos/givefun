@@ -32,8 +32,9 @@ export default function LaunchClient(props: Props) {
   );
 }
 
-type Stage = "idle" | "prepare" | "sign" | "create" | "lock" | "verify";
+type Stage = "idle" | "vanity" | "prepare" | "sign" | "create" | "lock" | "verify";
 const STAGES: { id: Stage; label: string }[] = [
+  { id: "vanity", label: "Generating pump address" },
   { id: "prepare", label: "Preparing" },
   { id: "sign", label: "Approve in wallet" },
   { id: "create", label: "Creating coin" },
@@ -62,8 +63,10 @@ function Form({ charities, platformBps, paused }: Props) {
   const [stage, setStage] = useState<Stage>("idle");
   const [err, setErr] = useState("");
   const [pending, setPending] = useState<PendingLock | null>(null);
+  const [vanityProgress, setVanityProgress] = useState({ attempts: 0, attemptsPerSecond: 0 });
   const busy = stage !== "idle";
   const urlRef = useRef<string | null>(null);
+  const cancelVanityRef = useRef<(() => void) | null>(null);
 
   const platformPct = platformBps / 100;
   const maxPct = 100 - platformPct;
@@ -102,6 +105,70 @@ function Form({ charities, platformBps, paused }: Props) {
       /* ignore */
     }
   };
+
+  // Generate the pump-style mint entirely in a browser worker. A "pump" suffix averages
+  // about 11.3M Ed25519 key attempts, so don't block the launch form's main thread.
+  function generatePumpMint(onProgress: (p: { attempts: number; attemptsPerSecond: number }) => void): Promise<Keypair> {
+    return new Promise((resolve, reject) => {
+      const worker = new Worker(new URL("../workers/vanity-mint.worker.ts", import.meta.url), { type: "module" });
+      let settled = false;
+      let cancel = () => {};
+      const cleanup = () => {
+        worker.terminate();
+        if (cancelVanityRef.current === cancel) cancelVanityRef.current = null;
+      };
+      cancel = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(new Error("Vanity mint generation cancelled."));
+      };
+      cancelVanityRef.current = cancel;
+
+      worker.onmessage = (event: MessageEvent<{
+        type: "progress" | "done" | "error";
+        attempts?: number;
+        attemptsPerSecond?: number;
+        durationMs?: number;
+        publicKey?: string;
+        secretKey?: number[];
+        message?: string;
+      }>) => {
+        const data = event.data;
+        if (data.type === "progress") {
+          onProgress({
+            attempts: data.attempts ?? 0,
+            attemptsPerSecond: data.attemptsPerSecond ?? 0,
+          });
+          return;
+        }
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (data.type === "error" || !data.secretKey || !data.publicKey) {
+          reject(new Error(data.message || "Could not generate a pump-style mint. Please try again."));
+          return;
+        }
+        try {
+          const keypair = Keypair.fromSecretKey(Uint8Array.from(data.secretKey));
+          if (keypair.publicKey.toBase58() !== data.publicKey || !data.publicKey.endsWith("pump")) {
+            reject(new Error("Generated mint failed validation. Please try again."));
+            return;
+          }
+          resolve(keypair);
+        } catch {
+          reject(new Error("Generated mint keypair was invalid. Please try again."));
+        }
+      };
+      worker.onerror = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(new Error("Pump address generation failed in this browser. Please retry or use a desktop browser."));
+      };
+      worker.postMessage({ type: "start", maxAttempts: 60_000_000 });
+    });
+  }
 
   async function sendAndConfirm(tx: Transaction | VersionedTransaction, lastValid: number) {
     const raw = tx.serialize();
@@ -203,10 +270,17 @@ function Form({ charities, platformBps, paused }: Props) {
     } catch { /* balance check is best effort */ }
     let ticket = "";
     let mint = "";
+    let mintKp: Keypair | null = null;
     let created = false;
     try {
+      setStage("vanity");
+      setVanityProgress({ attempts: 0, attemptsPerSecond: 0 });
+      mintKp = await generatePumpMint(setVanityProgress);
+      mint = mintKp.publicKey.toBase58();
+
       setStage("prepare");
       const fd = new FormData();
+      fd.append("mint", mint);
       fd.append("creator", publicKey.toBase58());
       fd.append("name", name);
       fd.append("symbol", symbol);
@@ -225,7 +299,7 @@ function Form({ charities, platformBps, paused }: Props) {
       if (res.status === 413) throw new Error("Image is too large. Use one under 2MB.");
       if (!res.ok) throw new Error(j.error || `Prepare failed (${res.status})`);
       ticket = j.ticket;
-      mint = j.mint;
+      if (j.mint !== mint) throw new Error("Mint address mismatch. Please retry the launch.");
 
       setStage("sign");
       const flags = (j.versioned as boolean[]) ?? [];
@@ -233,8 +307,9 @@ function Form({ charities, platformBps, paused }: Props) {
         flags[n] ? VersionedTransaction.deserialize(Buffer.from(b, "base64")) : Transaction.from(Buffer.from(b, "base64")),
       );
       const signed = await signAllTransactions(txs as Transaction[]);
-      // Mint signs after the wallet so the wallet cannot invalidate it.
-      const mintKp = Keypair.fromSecretKey(Uint8Array.from(Buffer.from(j.mintSecret as string, "base64")));
+      // The vanity mint keypair stays in this browser. Mint signs after the wallet so the
+      // wallet cannot invalidate it; the secret key is never sent to the launch API.
+      if (!mintKp) throw new Error("Mint keypair is missing. Please retry the launch.");
       const first = signed[0] as Transaction | VersionedTransaction;
       if (first instanceof VersionedTransaction) first.sign([mintKp]);
       else first.partialSign(mintKp);
@@ -449,6 +524,23 @@ function Form({ charities, platformBps, paused }: Props) {
               );
             })}
           </ol>
+        )}
+
+        {busy && stage === "vanity" && (
+          <div className="rounded-xl border border-line bg-raise/40 p-4 text-sm">
+            <p className="text-cream">Generating a Pump-style address ending in <code>pump</code> on your device.</p>
+            <p className="mt-1 text-xs leading-5 text-mute">
+              This usually takes a few minutes. Your mint private key stays in your browser.
+            </p>
+            {vanityProgress.attempts > 0 && (
+              <p className="mt-2 font-mono text-xs text-mute">
+                {vanityProgress.attempts.toLocaleString()} attempts · {Math.round(vanityProgress.attemptsPerSecond).toLocaleString()} attempts/sec
+              </p>
+            )}
+            <button type="button" className="btn-ghost btn-sm mt-3" onClick={() => cancelVanityRef.current?.()}>
+              Cancel generation
+            </button>
+          </div>
         )}
 
         <button className="btn w-full py-4 text-base" disabled={busy || !publicKey || paused}>
